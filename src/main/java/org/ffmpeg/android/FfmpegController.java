@@ -1,6 +1,13 @@
 package org.ffmpeg.android;
 
 
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.media.MediaMetadataRetriever;
+import android.util.Log;
+
+import org.ffmpeg.android.ShellUtils.ShellCallback;
+
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -14,17 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.StringTokenizer;
-
-import org.ffmpeg.android.ShellUtils.ShellCallback;
-
-import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
-import android.graphics.Bitmap;
-import android.media.MediaMetadataRetriever;
-import android.util.Log;
 
 public class FfmpegController {
 
@@ -154,7 +150,6 @@ public class FfmpegController {
         sc.processComplete(exitVal);
         
         return exitVal;
-		
 	}
 	
 
@@ -530,7 +525,7 @@ out.avi – create this output file. Change it as you like, for example using an
 			cmd.add(Argument.FRAMERATE);
 			cmd.add(out.videoFps);
 		}
-		
+
 		if (out.audioBitrate != -1)
 		{
 			cmd.add(Argument.BITRATE_AUDIO);
@@ -561,8 +556,79 @@ out.avi – create this output file. Change it as you like, for example using an
 		
 		
 		return out;
-		
+
+
 	}
+
+    public void squareCrop(File inputFile, File outputFile, int squareSize, ShellCallback sc) throws IOException, InterruptedException
+    {
+        ArrayList<String> commandArray = new ArrayList<String>();
+
+        commandArray.add(mFfmpegBin);
+
+        commandArray.add("-y");
+        commandArray.add("-i");
+        commandArray.add(inputFile.getAbsolutePath());
+        commandArray.add("-filter:v");
+        commandArray.add("crop=" + squareSize + ":" + squareSize +":0:0");
+
+        /*
+        commandArray.add("-c:v");
+        commandArray.add("mpeg4");
+        */
+
+        /*
+        commandArray.add("-vcodec");
+        commandArray.add("mpeg4");
+        */
+
+        commandArray.add("-f");
+		commandArray.add("mpeg4");
+
+
+        //commandArray.add("-c:a");
+        commandArray.add("-c");
+        commandArray.add("copy");
+        commandArray.add(outputFile.getAbsolutePath());
+
+        StringBuilder command = new StringBuilder();
+        for(String s : commandArray)
+        {
+            command.append(s);
+            command.append(" ");
+        }
+        Log.d("", "Brandon: Command:" + command.toString());
+
+        execFFMPEG(commandArray, sc);
+    }
+
+    public void trim(File inputFile, File outputFile, ShellCallback sc) throws IOException, InterruptedException
+    {
+        ArrayList<String> c = new ArrayList<String>();
+        c.add(mFfmpegBin);
+        c.add("-i");
+        c.add(inputFile.getAbsolutePath());
+        c.add("-ss");
+        c.add("00:00:00");
+        c.add("-t");
+        c.add("00:00:02");
+
+        //c.add("-f");
+		//c.add("mpeg");
+
+        c.add("-async");
+        c.add("1");
+
+        c.add("-vcodec");
+        c.add("libx264");
+        c.add("-acodec");
+
+        //c.add("-c");
+        c.add("copy");
+
+        c.add(outputFile.getAbsolutePath());
+        execFFMPEG(c, sc);
+    }
 	
 	public Clip convertImageToMP4 (Clip mediaIn, int duration, String outPath, ShellCallback sc) throws Exception
 	{
@@ -616,9 +682,9 @@ out.avi – create this output file. Change it as you like, for example using an
 		result.mimeType = "video/mp4";
 
 		cmd.add(new File(result.path).getCanonicalPath());
-		
+
 		execFFMPEG(cmd, sc);
-		
+
 		return result;
 	}
 	
@@ -1092,10 +1158,7 @@ out.avi – create this output file. Change it as you like, for example using an
 
 		if (!withSound)
 			cmd.add("-an");
-		
-		cmd.add("-strict");
-		cmd.add("-2");//experimental
-	
+
 		mediaOut.path = outPath;
 		
 		cmd.add(mediaOut.path);
