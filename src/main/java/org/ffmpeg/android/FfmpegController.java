@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class FfmpegController {
 
@@ -602,10 +604,64 @@ out.avi – create this output file. Change it as you like, for example using an
         execFFMPEG(commandArray, sc);
     }
 
-    public void trim(File inputFile, File outputFile, ShellCallback sc) throws IOException, InterruptedException
-    {
-        ArrayList<String> c = new ArrayList<String>();
-        c.add(mFfmpegBin);
+	public void trim(final File inputFile, final File outputFile, final ShellCallback sc) throws IOException, InterruptedException
+	{
+		final Pattern pattern = Pattern.compile("[0-9]+\\s+kb\\/s$");
+		getAudioBitRate(inputFile, new ShellCallback()
+		{
+			@Override
+			public void shellOut(String shellLine)
+			{
+				shellLine = shellLine.trim();
+				if(shellLine.matches("^Stream(.*?)Audio:(.*?)kb\\/s$"))
+				{
+					Matcher m = pattern.matcher(shellLine);
+					if(m.find())
+					{
+						String rate = m.group();
+						if(rate != null)
+						{
+							rate = rate.replaceAll("[^0-9]", "").trim() + "k";
+							try
+							{
+								trimVideo(inputFile, outputFile, sc, rate);
+							}
+							catch (IOException e)
+							{
+								e.printStackTrace();
+							}
+							catch (InterruptedException e)
+							{
+								e.printStackTrace();
+							}
+						}
+					}
+				}
+			}
+
+			@Override
+			public void processComplete(int exitValue)
+			{
+				Log.d(TAG, "ks-process-complete");
+			}
+		});
+
+	}
+
+	private void getAudioBitRate(File inputFile, ShellCallback callback) throws IOException, InterruptedException
+	{
+		ArrayList<String> cmd = new ArrayList<>();
+		cmd.add(mFfmpegBin);
+		cmd.add("-i");
+		cmd.add(inputFile.getAbsolutePath());
+
+		execFFMPEG(cmd, callback );
+	}
+
+	private void trimVideo(File inputFile, File outputFile, ShellCallback sc, String audioBitRate) throws IOException, InterruptedException
+	{
+		ArrayList<String> c = new ArrayList<String>();
+		c.add(mFfmpegBin);
 
 		c.add("-i");
 		c.add(inputFile.getAbsolutePath());
@@ -613,8 +669,8 @@ out.avi – create this output file. Change it as you like, for example using an
 		c.add("-ss");
 		c.add("00:00:00");
 
-        c.add("-t");
-        c.add("00:00:02");
+		c.add("-t");
+		c.add("00:00:02");
 
 		c.add("-c:v");
 		c.add("libx264");
@@ -626,11 +682,11 @@ out.avi – create this output file. Change it as you like, for example using an
 		c.add("experimental");
 
 		c.add("-b:a");
-		c.add("24k");
+		c.add(audioBitRate);
 
-        c.add(outputFile.getAbsolutePath());
-        execFFMPEG(c, sc);
-    }
+		c.add(outputFile.getAbsolutePath());
+		execFFMPEG(c, sc);
+	}
 	
 	public Clip convertImageToMP4 (Clip mediaIn, int duration, String outPath, ShellCallback sc) throws Exception
 	{
