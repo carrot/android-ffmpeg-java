@@ -606,25 +606,27 @@ out.avi – create this output file. Change it as you like, for example using an
     {
         ArrayList<String> c = new ArrayList<String>();
         c.add(mFfmpegBin);
-        c.add("-i");
-        c.add(inputFile.getAbsolutePath());
-        c.add("-ss");
-        c.add("00:00:00");
+
+		c.add("-i");
+		c.add(inputFile.getAbsolutePath());
+
+		c.add("-ss");
+		c.add("00:00:00");
+
         c.add("-t");
         c.add("00:00:02");
 
-        //c.add("-f");
-		//c.add("mpeg");
+		c.add("-c:v");
+		c.add("libx264");
 
-        c.add("-async");
-        c.add("1");
+		c.add("-c:a");
+		c.add("aac");
 
-        c.add("-vcodec");
-        c.add("libx264");
-        c.add("-acodec");
+		c.add("-strict");
+		c.add("experimental");
 
-        //c.add("-c");
-        c.add("copy");
+		c.add("-b:a");
+		c.add("24k");
 
         c.add(outputFile.getAbsolutePath());
         execFFMPEG(c, sc);
