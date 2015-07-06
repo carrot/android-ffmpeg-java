@@ -616,14 +616,14 @@ out.avi – create this output file. Change it as you like, for example using an
         c.add("-c:v");
         c.add("libx264");
 
-	c.add("-c:a");
+	 c.add("-c:a");
         c.add("-aac");
 
         c.add("-strict");
-	c.add("experimental");
+	 c.add("experimental");
 
-	c.add("-b:a");
-	c.add("24k");
+	 c.add("-b:a");
+	 c.add("24k");
 
         c.add(outputFile.getAbsolutePath());
         execFFMPEG(c, sc);
