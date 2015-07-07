@@ -97,7 +97,7 @@ public class FfmpegController {
 	
 		enablePermissions();
 		
-		execProcess (cmd, sc, fileExec);
+		execProcess(cmd, sc, fileExec);
 	}
 	
 	private void enablePermissions () throws IOException
@@ -609,31 +609,58 @@ out.avi – create this output file. Change it as you like, for example using an
 		final Pattern pattern = Pattern.compile("[0-9]+\\s+kb\\/s$");
 		fileInfo(inputFile, new ShellCallback()
 		{
+			String rotate = null;
+			String audioBitRate = null;
+			boolean metaDataHeader = false;
+			boolean executed = false;
+
 			@Override
 			public void shellOut(String shellLine)
 			{
 				shellLine = shellLine.trim();
-				Log.d(TAG, "inputFileInfo=" + shellLine);
+				/**
+				 *  Check for audio bit rate
+				 */
 				if (shellLine.matches("^Stream(.*?)Audio:(.*?)kb\\/s$"))
 				{
 					Matcher m = pattern.matcher(shellLine);
-					if (m.find())
+					if (m.find() && audioBitRate == null)
 					{
-						String rate = m.group();
-						if (rate != null)
+						audioBitRate = m.group();
+						if (audioBitRate != null)
 						{
-							rate = rate.replaceAll("[^0-9]", "").trim() + "k";
-							try
-							{
-								trimVideo(inputFile, outputFile, sc, rate);
-							} catch (IOException e)
-							{
-								e.printStackTrace();
-							} catch (InterruptedException e)
-							{
-								e.printStackTrace();
-							}
+							audioBitRate = audioBitRate.replaceAll("[^0-9]", "").trim() + "k";
 						}
+					}
+				}
+
+				/**
+				 * Check for rotation
+				 */
+				if(shellLine.matches("^Metadata:"))
+				{
+					metaDataHeader = true;
+				}
+
+				if(metaDataHeader && shellLine.startsWith("rotate") && rotate == null)
+				{
+					rotate = shellLine.replaceAll("[^0-9]","").trim();
+				}
+
+				if( ! executed && rotate != null && audioBitRate != null)
+				{
+					executed = true;
+					try
+					{
+						trimVideo(inputFile, outputFile, sc, audioBitRate, rotate);
+					}
+					catch (IOException e)
+					{
+						e.printStackTrace();
+					}
+					catch (InterruptedException e)
+					{
+						e.printStackTrace();
 					}
 				}
 			}
@@ -657,7 +684,7 @@ out.avi – create this output file. Change it as you like, for example using an
 		execFFMPEG(cmd, callback );
 	}
 
-	private void trimVideo(File inputFile, File outputFile, ShellCallback sc, String audioBitRate) throws IOException, InterruptedException
+	private void trimVideo(File inputFile, File outputFile, ShellCallback sc, String audioBitRate, String rotate) throws IOException, InterruptedException
 	{
 		ArrayList<String> c = new ArrayList<String>();
 		c.add(mFfmpegBin);
@@ -682,6 +709,25 @@ out.avi – create this output file. Change it as you like, for example using an
 
 		c.add("-b:a");
 		c.add(audioBitRate);
+
+		if(rotate.equals("90"))
+		{
+			c.add("-vf");
+			c.add("transpose=" + 1);
+		}
+		else if (rotate.equals("180"))
+		{
+			c.add("-vf");
+			c.add("vflip,hflip");
+		}
+		else if (rotate.equals("270"))
+		{
+			c.add("-vf");
+			c.add("transpose=" + 2);
+		}
+
+		/*c.add("-metadata:s:v:0");
+		c.add("rotate=" + rotate);*/
 
 		c.add("-y");
 
