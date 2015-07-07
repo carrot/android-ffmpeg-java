@@ -562,47 +562,197 @@ out.avi – create this output file. Change it as you like, for example using an
 
 	}
 
-    public void squareCrop(File inputFile, File outputFile, int squareSize, ShellCallback sc) throws IOException, InterruptedException
+    public void squareCrop(final File inputFile, final File outputFile, final int squareSize, final ShellCallback sc) throws IOException, InterruptedException
     {
-        ArrayList<String> commandArray = new ArrayList<String>();
+		final Pattern pattern = Pattern.compile("[0-9]+\\s+kb\\/s$");
+		fileInfo(inputFile, new ShellCallback()
+		{
+			String rotate = null;
+			String audioBitRate = null;
+			boolean metaDataHeader = false;
+			boolean executed = false;
 
-        commandArray.add(mFfmpegBin);
+			@Override
+			public void shellOut(String shellLine)
+			{
+				shellLine = shellLine.trim();
+				/**
+				 *  Check for audio bit rate
+				 */
+				if (shellLine.matches("^Stream(.*?)Audio:(.*?)kb\\/s$"))
+				{
+					Matcher m = pattern.matcher(shellLine);
+					if (m.find() && audioBitRate == null)
+					{
+						audioBitRate = m.group();
+						if (audioBitRate != null)
+						{
+							audioBitRate = audioBitRate.replaceAll("[^0-9]", "").trim() + "k";
+						}
+					}
+				}
 
-        commandArray.add("-y");
-        commandArray.add("-i");
-        commandArray.add(inputFile.getAbsolutePath());
-        commandArray.add("-filter:v");
-        commandArray.add("crop=" + squareSize + ":" + squareSize +":0:0");
+				/**
+				 * Check for rotation
+				 */
+				if(shellLine.matches("^Metadata:"))
+				{
+					metaDataHeader = true;
+				}
 
-        /*
-        commandArray.add("-c:v");
-        commandArray.add("mpeg4");
-        */
+				if(metaDataHeader && shellLine.startsWith("rotate") && rotate == null)
+				{
+					rotate = shellLine.replaceAll("[^0-9]","").trim();
+				}
 
-        /*
-        commandArray.add("-vcodec");
-        commandArray.add("mpeg4");
-        */
+				if( ! executed && rotate != null && audioBitRate != null)
+				{
+					executed = true;
+					try
+					{
+						squareCropVideo(inputFile, outputFile, squareSize, sc, audioBitRate, rotate);
+					}
+					catch (IOException e)
+					{
+						e.printStackTrace();
+					}
+					catch (InterruptedException e)
+					{
+						e.printStackTrace();
+					}
+				}
+			}
 
-        commandArray.add("-f");
-		commandArray.add("mpeg4");
+			@Override
+			public void processComplete(int exitValue)
+			{
+				Log.d(TAG, "ks-process-complete");
+			}
+		});
+	}
+
+	private void squareCropVideo(File inputFile, final File outputFile, int squareSize, final ShellCallback sc, final String audioBitRate, final String rotate) throws IOException, InterruptedException
+	{
+		ArrayList<String> c = new ArrayList<String>();
+
+		c.add(mFfmpegBin);
+
+		c.add("-y");
+		c.add("-i");
+		c.add(inputFile.getAbsolutePath());
+		c.add("-filter:v");
+		c.add("crop=" + squareSize + ":" + squareSize +":0:0");
+
+		c.add("-c:v");
+		c.add("libx264");
+
+		c.add("-c:a");
+		c.add("aac");
+
+		c.add("-strict");
+		c.add("experimental");
+
+		c.add("-b:a");
+		c.add(audioBitRate);
+
+		String absPath = outputFile.getAbsolutePath();
+		final File tempFile = new File(absPath.substring(0, absPath.lastIndexOf(".")) + "_sqr.mp4");
+		c.add(tempFile.getAbsolutePath());
+
+		StringBuilder command = new StringBuilder();
+		for(String s : c)
+		{
+			command.append(s);
+			command.append(" ");
+		}
+		Log.d("", "Brandon: Command:" + command.toString());
+
+		execFFMPEG(c, new ShellCallback()
+		{
+			@Override
+			public void shellOut(String shellLine)
+			{
+				sc.shellOut(shellLine);
+			}
+
+			@Override
+			public void processComplete(int exitValue)
+			{
+				try
+				{
+					ShellCallback callback = new ShellCallback()
+					{
+						@Override
+						public void shellOut(String shellLine)
+						{
+							sc.shellOut(shellLine);
+						}
+
+						@Override
+						public void processComplete(int exitValue)
+						{
+							sc.processComplete(exitValue);
+							if(tempFile.exists())
+							{
+								tempFile.delete();
+							}
+						}
+					};
+
+					rotateVideo(tempFile, outputFile, callback, audioBitRate, rotate);
+				}
+				catch (IOException e)
+				{
+					e.printStackTrace();
+				} catch (InterruptedException e)
+				{
+					e.printStackTrace();
+				}
+			}
+		});
+	}
+
+	private void rotateVideo(File inputFile, File outputFile, ShellCallback sc, String audioBitRate, String rotate) throws IOException, InterruptedException
+	{
+		ArrayList<String> c = new ArrayList<String>();
+
+		c.add(mFfmpegBin);
+
+		c.add("-y");
+		c.add("-i");
+		c.add(inputFile.getAbsolutePath());
+		c.add("-c:v");
+		c.add("libx264");
+
+		c.add("-c:a");
+		c.add("aac");
+
+		c.add("-strict");
+		c.add("experimental");
+
+		c.add("-b:a");
+		c.add(audioBitRate);
 
 
-        //commandArray.add("-c:a");
-        commandArray.add("-c");
-        commandArray.add("copy");
-        commandArray.add(outputFile.getAbsolutePath());
+		if(rotate.equals("90"))
+		{
+			c.add("-vf");
+			c.add("transpose=" + 1);
+		}
+		else if (rotate.equals("180"))
+		{
+			c.add("-vf");
+			c.add("vflip,hflip");
+		}
+		else if (rotate.equals("270"))
+		{
+			c.add("-vf");
+			c.add("transpose=" + 2);
+		}
 
-        StringBuilder command = new StringBuilder();
-        for(String s : commandArray)
-        {
-            command.append(s);
-            command.append(" ");
-        }
-        Log.d("", "Brandon: Command:" + command.toString());
-
-        execFFMPEG(commandArray, sc);
-    }
+		c.add(outputFile.getAbsolutePath());
+		execFFMPEG(c, sc);
+	}
 
 	public void trim(final File inputFile, final File outputFile, final ShellCallback sc) throws IOException, InterruptedException
 	{
