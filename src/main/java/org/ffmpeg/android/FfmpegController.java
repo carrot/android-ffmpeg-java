@@ -655,6 +655,9 @@ out.avi – create this output file. Change it as you like, for example using an
 		c.add("-b:a");
 		c.add(audioBitRate);
 
+		c.add("-preset");
+		c.add("ultrafast");
+
 		String absPath = outputFile.getAbsolutePath();
 		final File tempFile = new File(absPath.substring(0, absPath.lastIndexOf(".")) + "_sqr.mp4");
 		c.add(tempFile.getAbsolutePath());
@@ -704,7 +707,8 @@ out.avi – create this output file. Change it as you like, for example using an
 				catch (IOException e)
 				{
 					e.printStackTrace();
-				} catch (InterruptedException e)
+				}
+				catch (InterruptedException e)
 				{
 					e.printStackTrace();
 				}
@@ -733,6 +737,8 @@ out.avi – create this output file. Change it as you like, for example using an
 		c.add("-b:a");
 		c.add(audioBitRate);
 
+		c.add("-preset");
+		c.add("ultrafast");
 
 		if(rotate.equals("90"))
 		{
