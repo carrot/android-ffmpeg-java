@@ -607,30 +607,29 @@ out.avi – create this output file. Change it as you like, for example using an
 	public void trim(final File inputFile, final File outputFile, final ShellCallback sc) throws IOException, InterruptedException
 	{
 		final Pattern pattern = Pattern.compile("[0-9]+\\s+kb\\/s$");
-		getAudioBitRate(inputFile, new ShellCallback()
+		fileInfo(inputFile, new ShellCallback()
 		{
 			@Override
 			public void shellOut(String shellLine)
 			{
 				shellLine = shellLine.trim();
-				if(shellLine.matches("^Stream(.*?)Audio:(.*?)kb\\/s$"))
+				Log.d(TAG, "inputFileInfo=" + shellLine);
+				if (shellLine.matches("^Stream(.*?)Audio:(.*?)kb\\/s$"))
 				{
 					Matcher m = pattern.matcher(shellLine);
-					if(m.find())
+					if (m.find())
 					{
 						String rate = m.group();
-						if(rate != null)
+						if (rate != null)
 						{
 							rate = rate.replaceAll("[^0-9]", "").trim() + "k";
 							try
 							{
 								trimVideo(inputFile, outputFile, sc, rate);
-							}
-							catch (IOException e)
+							} catch (IOException e)
 							{
 								e.printStackTrace();
-							}
-							catch (InterruptedException e)
+							} catch (InterruptedException e)
 							{
 								e.printStackTrace();
 							}
@@ -648,7 +647,7 @@ out.avi – create this output file. Change it as you like, for example using an
 
 	}
 
-	private void getAudioBitRate(File inputFile, ShellCallback callback) throws IOException, InterruptedException
+	public void fileInfo(File inputFile, ShellCallback callback) throws IOException, InterruptedException
 	{
 		ArrayList<String> cmd = new ArrayList<>();
 		cmd.add(mFfmpegBin);
@@ -683,6 +682,8 @@ out.avi – create this output file. Change it as you like, for example using an
 
 		c.add("-b:a");
 		c.add(audioBitRate);
+
+		c.add("-y");
 
 		c.add(outputFile.getAbsolutePath());
 		execFFMPEG(c, sc);
