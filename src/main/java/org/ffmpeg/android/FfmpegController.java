@@ -4,6 +4,8 @@ package org.ffmpeg.android;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.media.MediaMetadataRetriever;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 
 import org.ffmpeg.android.ShellUtils.ShellCallback;
@@ -21,6 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.StringTokenizer;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -562,76 +568,15 @@ out.avi – create this output file. Change it as you like, for example using an
 
 	}
 
-    public void squareCrop(final File inputFile, final File outputFile, final int squareSize, final ShellCallback sc) throws IOException, InterruptedException
+    public void squareCrop(final File inputFile, final File outputFile, final ShellCallback sc) throws IOException, InterruptedException
     {
-		final Pattern pattern = Pattern.compile("[0-9]+\\s+kb\\/s$");
-		fileInfo(inputFile, new ShellCallback()
-		{
-			String rotate = null;
-			String audioBitRate = null;
-			boolean metaDataHeader = false;
-			boolean executed = false;
-
-			@Override
-			public void shellOut(String shellLine)
-			{
-				shellLine = shellLine.trim();
-				/**
-				 *  Check for audio bit rate
-				 */
-				if (shellLine.matches("^Stream(.*?)Audio:(.*?)kb\\/s$"))
-				{
-					Matcher m = pattern.matcher(shellLine);
-					if (m.find() && audioBitRate == null)
-					{
-						audioBitRate = m.group();
-						if (audioBitRate != null)
-						{
-							audioBitRate = audioBitRate.replaceAll("[^0-9]", "").trim() + "k";
-						}
-					}
-				}
-
-				/**
-				 * Check for rotation
-				 */
-				if(shellLine.matches("^Metadata:"))
-				{
-					metaDataHeader = true;
-				}
-
-				if(metaDataHeader && shellLine.startsWith("rotate") && rotate == null)
-				{
-					rotate = shellLine.replaceAll("[^0-9]","").trim();
-				}
-
-				if( ! executed && rotate != null && audioBitRate != null)
-				{
-					executed = true;
-					try
-					{
-						squareCropVideo(inputFile, outputFile, squareSize, sc, audioBitRate, rotate);
-					}
-					catch (IOException e)
-					{
-						e.printStackTrace();
-					}
-					catch (InterruptedException e)
-					{
-						e.printStackTrace();
-					}
-				}
-			}
-
-			@Override
-			public void processComplete(int exitValue)
-			{
-				Log.d(TAG, "ks-process-complete");
-			}
-		});
+		Clip videoInfo = new Clip(inputFile.getAbsolutePath());
+		videoInfo = getMediaInfo(videoInfo);
+		int squareSize = Math.min(videoInfo.height, videoInfo.width);
+		squareCropVideo(inputFile, outputFile, squareSize, sc, videoInfo.audioBitrate, videoInfo.rotate );
 	}
 
-	private void squareCropVideo(File inputFile, final File outputFile, int squareSize, final ShellCallback sc, final String audioBitRate, final String rotate) throws IOException, InterruptedException
+	private void squareCropVideo(File inputFile, final File outputFile, int squareSize, final ShellCallback sc, final int audioBitRate, final int rotate) throws IOException, InterruptedException
 	{
 		ArrayList<String> c = new ArrayList<String>();
 
@@ -640,8 +585,12 @@ out.avi – create this output file. Change it as you like, for example using an
 		c.add("-y");
 		c.add("-i");
 		c.add(inputFile.getAbsolutePath());
-		c.add("-filter:v");
-		c.add("crop=" + squareSize + ":" + squareSize +":0:0");
+
+		if(squareSize != -1)
+		{
+			c.add("-filter:v");
+			c.add("crop=" + squareSize + ":" + squareSize +":0:0");
+		}
 
 		c.add("-c:v");
 		c.add("libx264");
@@ -649,11 +598,14 @@ out.avi – create this output file. Change it as you like, for example using an
 		c.add("-c:a");
 		c.add("aac");
 
-		c.add("-strict");
-		c.add("experimental");
+		if(audioBitRate != -1)
+		{
+			c.add("-strict");
+			c.add("experimental");
 
-		c.add("-b:a");
-		c.add(audioBitRate);
+			c.add("-b:a");
+			c.add(String.valueOf(audioBitRate));
+		}
 
 		c.add("-preset");
 		c.add("ultrafast");
@@ -668,6 +620,7 @@ out.avi – create this output file. Change it as you like, for example using an
 			command.append(s);
 			command.append(" ");
 		}
+
 		Log.d("", "Brandon: Command:" + command.toString());
 
 		execFFMPEG(c, new ShellCallback()
@@ -716,7 +669,7 @@ out.avi – create this output file. Change it as you like, for example using an
 		});
 	}
 
-	private void rotateVideo(File inputFile, File outputFile, ShellCallback sc, String audioBitRate, String rotate) throws IOException, InterruptedException
+	private void rotateVideo(File inputFile, File outputFile, ShellCallback sc, int audioBitRate, int rotate) throws IOException, InterruptedException
 	{
 		ArrayList<String> c = new ArrayList<String>();
 
@@ -735,25 +688,28 @@ out.avi – create this output file. Change it as you like, for example using an
 		c.add("experimental");
 
 		c.add("-b:a");
-		c.add(audioBitRate);
+		c.add(String.valueOf(audioBitRate));
 
 		c.add("-preset");
 		c.add("ultrafast");
 
-		if(rotate.equals("90"))
+		if(rotate != -1)
 		{
-			c.add("-vf");
-			c.add("transpose=" + 1);
-		}
-		else if (rotate.equals("180"))
-		{
-			c.add("-vf");
-			c.add("vflip,hflip");
-		}
-		else if (rotate.equals("270"))
-		{
-			c.add("-vf");
-			c.add("transpose=" + 2);
+			if(rotate == 90)
+			{
+				c.add("-vf");
+				c.add("transpose=" + 1);
+			}
+			else if (rotate == 180)
+			{
+				c.add("-vf");
+				c.add("vflip,hflip");
+			}
+			else if (rotate == 270)
+			{
+				c.add("-vf");
+				c.add("transpose=" + 2);
+			}
 		}
 
 		c.add(outputFile.getAbsolutePath());
@@ -1567,22 +1523,118 @@ out.avi – create this output file. Change it as you like, for example using an
 		InfoParser ip = new InfoParser(in);
 		execFFMPEG(cmd,ip, null);
 
-		try{Thread.sleep(200);}
+		try{Thread.sleep(500);}
 		catch (Exception e){}
-	
-		
+
+
 		return in;
 		
+	}
+
+	public Clip getMediaInfo(final Clip clip)
+	{
+		Log.d(TAG, "getMediaInfo");
+		final CountDownLatch latch = new CountDownLatch(1);
+		GetMediaInfo info = new GetMediaInfo(new Callable<Clip>()
+		{
+			private Clip mClip;
+
+			@Override
+			public Clip call() throws Exception
+			{
+				Log.d(TAG, "call");
+				ArrayList<String> cmd = new ArrayList<String>();
+				cmd.add(mFfmpegBin);
+				cmd.add("-y");
+				cmd.add("-i");
+
+				File f = new File(clip.path);
+				cmd.add(f.getAbsolutePath());
+
+				InfoParserListener listener = new InfoParserListener()
+				{
+					@Override
+					public void onDone(Clip clip)
+					{
+						latch.countDown();
+						mClip = clip;
+					}
+				};
+
+				InfoParser parser = new InfoParser(clip);
+				execFFMPEG(cmd, parser);
+				latch.await();
+				return mClip;
+			}
+		});
+		try
+		{
+			Log.d(TAG, "calling Get");
+			return info.get();
+		}
+		catch (InterruptedException e)
+		{
+			e.printStackTrace();
+		}
+		catch (ExecutionException e)
+		{
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	private class GetMediaInfo extends FutureTask<Clip>
+	{
+		/**
+		 * Creates a {@code FutureTask} that will, upon running, execute the
+		 * given {@code Callable}.
+		 *
+		 * @param callable the callable task
+		 * @throws NullPointerException if the callable is null
+		 */
+		public GetMediaInfo(Callable<Clip> callable)
+		{
+			super(callable);
+		}
 	}
 	
 	private class InfoParser implements ShellCallback {
 		
 		private Clip mMedia;
+		boolean mProcessComplete = false;
+		boolean mValueReturned = false;
 		private int retValue;
-		
+		private InfoParserListener mInfoParserListener;
+
+		private static final int RETURN = 0x1;
+		private Handler mHandler = new Handler(new Handler.Callback()
+		{
+			@Override
+			public boolean handleMessage(Message msg)
+			{
+				Log.d(TAG, "msg.what=" + msg);
+				if(msg.what == RETURN)
+				{
+					mValueReturned = true;
+					if(mInfoParserListener != null)
+					{
+						mInfoParserListener.onDone(mMedia);
+					}
+				}
+				return false;
+			}
+		});
+
 		public InfoParser (Clip media)
 		{
 			mMedia = media;
+		}
+
+		public InfoParser (Clip media, InfoParserListener infoParserListener)
+		{
+			mMedia = media;
+			mInfoParserListener = infoParserListener;
 		}
 
 		@Override
@@ -1624,12 +1676,33 @@ out.avi – create this output file. Change it as you like, for example using an
 				mMedia.audioCodec = audioInfo[0];
 				
 			}
+
+			else if(shellLine.trim().startsWith("rotate"))
+			{
+				String rotate = shellLine.replaceAll("[^0-9]","").trim();
+				if(rotate != null && !rotate.isEmpty())
+				{
+					try
+					{
+						mMedia.rotate = Integer.parseInt(rotate);
+					}
+					catch (NumberFormatException e)
+					{
+						e.printStackTrace();
+					}
+				}
+			}
 			    
 	
 	//
     //Stream #0.0(und): Video: h264 (Baseline), yuv420p, 1280x720, 8052 kb/s, 29.97 fps, 90k tbr, 90k tbn, 180k tbc
     //Stream #0.1(und): Audio: mp2, 22050 Hz, 2 channels, s16, 127 kb/s
-    
+
+			if( ! mValueReturned)
+			{
+				mHandler.removeMessages(RETURN);
+				mHandler.sendEmptyMessageDelayed(RETURN, 1000);
+			}
 		}
 
 		@Override
@@ -1638,7 +1711,12 @@ out.avi – create this output file. Change it as you like, for example using an
 
 		}
 	}
-	
+
+	public interface InfoParserListener
+	{
+		public void onDone(Clip clip);
+	}
+
 	private class StreamGobbler extends Thread
 	{
 	    InputStream is;

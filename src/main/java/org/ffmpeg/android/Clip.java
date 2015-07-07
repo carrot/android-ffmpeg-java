@@ -31,6 +31,8 @@ public class Clip implements Cloneable
 	public String qscale;
 	public String aspect;
 	public int passCount = 1; //default
+
+	public int rotate = -1;
 		
 	public Clip ()
 	{
