@@ -23,10 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.StringTokenizer;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -570,10 +566,27 @@ out.avi – create this output file. Change it as you like, for example using an
 
     public void squareCrop(final File inputFile, final File outputFile, final ShellCallback sc) throws IOException, InterruptedException
     {
-		Clip videoInfo = new Clip(inputFile.getAbsolutePath());
-		videoInfo = getMediaInfo(videoInfo);
-		int squareSize = Math.min(videoInfo.height, videoInfo.width);
-		squareCropVideo(inputFile, outputFile, squareSize, sc, videoInfo.audioBitrate, videoInfo.rotate );
+		getMediaInfo(new Clip(inputFile.getAbsolutePath()), new InfoParserListener()
+		{
+			@Override
+			public void onDone(Clip clip)
+			{
+				int squareSize = Math.min(clip.height, clip.width);
+				try
+				{
+					squareCropVideo(inputFile, outputFile, squareSize, sc, clip.audioBitrate, clip.rotate);
+				}
+				catch (IOException e)
+				{
+					e.printStackTrace();
+				}
+				catch (InterruptedException e)
+				{
+					e.printStackTrace();
+				}
+			}
+		});
+
 	}
 
 	private void squareCropVideo(File inputFile, final File outputFile, int squareSize, final ShellCallback sc, final int audioBitRate, final int rotate) throws IOException, InterruptedException
@@ -1523,7 +1536,7 @@ out.avi – create this output file. Change it as you like, for example using an
 		InfoParser ip = new InfoParser(in);
 		execFFMPEG(cmd,ip, null);
 
-		try{Thread.sleep(500);}
+		try{Thread.sleep(200);}
 		catch (Exception e){}
 
 
@@ -1531,78 +1544,23 @@ out.avi – create this output file. Change it as you like, for example using an
 		
 	}
 
-	public Clip getMediaInfo(final Clip clip)
+	public void getMediaInfo(final Clip clip, InfoParserListener infoParserListener) throws IOException, InterruptedException
 	{
-		Log.d(TAG, "getMediaInfo");
-		final CountDownLatch latch = new CountDownLatch(1);
-		GetMediaInfo info = new GetMediaInfo(new Callable<Clip>()
-		{
-			private Clip mClip;
+		ArrayList<String> cmd = new ArrayList<String>();
+		cmd.add(mFfmpegBin);
+		cmd.add("-y");
+		cmd.add("-i");
 
-			@Override
-			public Clip call() throws Exception
-			{
-				Log.d(TAG, "call");
-				ArrayList<String> cmd = new ArrayList<String>();
-				cmd.add(mFfmpegBin);
-				cmd.add("-y");
-				cmd.add("-i");
+		File f = new File(clip.path);
+		cmd.add(f.getAbsolutePath());
 
-				File f = new File(clip.path);
-				cmd.add(f.getAbsolutePath());
-
-				InfoParserListener listener = new InfoParserListener()
-				{
-					@Override
-					public void onDone(Clip clip)
-					{
-						latch.countDown();
-						mClip = clip;
-					}
-				};
-
-				InfoParser parser = new InfoParser(clip);
-				execFFMPEG(cmd, parser);
-				latch.await();
-				return mClip;
-			}
-		});
-		try
-		{
-			Log.d(TAG, "calling Get");
-			return info.get();
-		}
-		catch (InterruptedException e)
-		{
-			e.printStackTrace();
-		}
-		catch (ExecutionException e)
-		{
-			e.printStackTrace();
-		}
-
-		return null;
-	}
-
-	private class GetMediaInfo extends FutureTask<Clip>
-	{
-		/**
-		 * Creates a {@code FutureTask} that will, upon running, execute the
-		 * given {@code Callable}.
-		 *
-		 * @param callable the callable task
-		 * @throws NullPointerException if the callable is null
-		 */
-		public GetMediaInfo(Callable<Clip> callable)
-		{
-			super(callable);
-		}
+		InfoParser parser = new InfoParser(clip, infoParserListener);
+		execFFMPEG(cmd, parser);
 	}
 	
 	private class InfoParser implements ShellCallback {
 		
 		private Clip mMedia;
-		boolean mProcessComplete = false;
 		boolean mValueReturned = false;
 		private int retValue;
 		private InfoParserListener mInfoParserListener;
@@ -1613,7 +1571,6 @@ out.avi – create this output file. Change it as you like, for example using an
 			@Override
 			public boolean handleMessage(Message msg)
 			{
-				Log.d(TAG, "msg.what=" + msg);
 				if(msg.what == RETURN)
 				{
 					mValueReturned = true;
@@ -1665,6 +1622,10 @@ out.avi – create this output file. Change it as you like, for example using an
 				String[] videoInfo = line[3].split(",");
 				
 				mMedia.videoCodec = videoInfo[0];
+				String resolution[] = videoInfo[2].split("x");
+				mMedia.height = Integer.parseInt(resolution[0].trim());
+				mMedia.width = Integer.parseInt(resolution[1].trim());
+
 			}
 			
 			//Stream #0:1(eng): Audio: aac (mp4a / 0x6134706D), 48000 Hz, stereo, s16, 121 kb/s
@@ -1674,7 +1635,15 @@ out.avi – create this output file. Change it as you like, for example using an
 				String[] audioInfo = line[3].split(",");
 				
 				mMedia.audioCodec = audioInfo[0];
-				
+				String bitRate = audioInfo[4].replaceAll("[^0-9]", "").trim();
+				try
+				{
+					mMedia.audioBitrate = Integer.parseInt(bitRate) ;
+				}
+				catch (NumberFormatException e)
+				{
+					e.printStackTrace();
+				}
 			}
 
 			else if(shellLine.trim().startsWith("rotate"))
@@ -1698,7 +1667,7 @@ out.avi – create this output file. Change it as you like, for example using an
     //Stream #0.0(und): Video: h264 (Baseline), yuv420p, 1280x720, 8052 kb/s, 29.97 fps, 90k tbr, 90k tbn, 180k tbc
     //Stream #0.1(und): Audio: mp2, 22050 Hz, 2 channels, s16, 127 kb/s
 
-			if( ! mValueReturned)
+			if( ! mValueReturned )
 			{
 				mHandler.removeMessages(RETURN);
 				mHandler.sendEmptyMessageDelayed(RETURN, 1000);
