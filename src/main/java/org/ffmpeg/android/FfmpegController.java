@@ -634,7 +634,7 @@ out.avi – create this output file. Change it as you like, for example using an
 			command.append(" ");
 		}
 
-		Log.d("", "Brandon: Command:" + command.toString());
+		Log.d(TAG, "Command:" + command.toString());
 
 		execFFMPEG(c, new ShellCallback()
 		{
@@ -793,7 +793,7 @@ out.avi – create this output file. Change it as you like, for example using an
 			@Override
 			public void processComplete(int exitValue)
 			{
-				Log.d(TAG, "ks-process-complete");
+				Log.d(TAG, "trim-process-complete");
 			}
 		});
 
