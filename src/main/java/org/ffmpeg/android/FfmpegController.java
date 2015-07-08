@@ -99,7 +99,7 @@ public class FfmpegController {
 	
 		enablePermissions();
 		
-		execProcess(cmd, sc, fileExec);
+		execProcess (cmd, sc, fileExec);
 	}
 	
 	private void enablePermissions () throws IOException
@@ -1667,6 +1667,14 @@ out.avi – create this output file. Change it as you like, for example using an
     //Stream #0.0(und): Video: h264 (Baseline), yuv420p, 1280x720, 8052 kb/s, 29.97 fps, 90k tbr, 90k tbn, 180k tbc
     //Stream #0.1(und): Audio: mp2, 22050 Hz, 2 channels, s16, 127 kb/s
 
+			/**
+			 * Since process complete gets called before the parsing is complete, there is no reliable
+			 * way to know when the parsing finished.
+			 * So we use a handler approach here.
+			 * Everytime we receive a output - we setup a 1 sec scheduled handler message.
+			 * If a new string is received within the 1 sec the message is cancelled
+			 * and a new message is Queued.
+			 */
 			if( ! mValueReturned )
 			{
 				mHandler.removeMessages(RETURN);
@@ -1681,8 +1689,15 @@ out.avi – create this output file. Change it as you like, for example using an
 		}
 	}
 
+	/**
+	 * An interface to pass the parsed return value as a Clip
+	 */
 	public interface InfoParserListener
 	{
+		/**
+		 * The is called when the parsing is complete.
+		 * @param clip The info about the video.
+		 */
 		public void onDone(Clip clip);
 	}
 
