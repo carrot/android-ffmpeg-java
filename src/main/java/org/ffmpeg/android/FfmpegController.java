@@ -1615,17 +1615,70 @@ out.avi – create this output file. Change it as you like, for example using an
 			
 			}
 			
-			//   Stream #0:0(eng): Video: h264 (High) (avc1 / 0x31637661), yuv420p, 1920x1080, 16939 kb/s, 30.02 fps, 30 tbr, 90k tbn, 180k tbc
+			//Stream #0:0(eng): Video: h264 (High) (avc1 / 0x31637661), yuv420p, 1920x1080, 16939 kb/s, 30.02 fps, 30 tbr, 90k tbn, 180k tbc
+			//Stream #0:0(eng): Video: mpeg4 (Simple Profile) (mp4v / 0x7634706D), yuv420p, 1280x960 [SAR 1:1 DAR 4:3], 1509 kb/s, 29.69 fps, 29.83 tbr, 90k tbn, 30k tbc
 			else if (shellLine.contains(": Video:"))
 			{
 				String[] line = shellLine.split(":");
 				String[] videoInfo = line[3].split(",");
-				
-				mMedia.videoCodec = videoInfo[0];
-				String resolution[] = videoInfo[2].split("x");
-				mMedia.height = Integer.parseInt(resolution[0].trim());
-				mMedia.width = Integer.parseInt(resolution[1].trim());
 
+				mMedia.videoCodec = videoInfo[0];
+				String resolution = videoInfo[2];
+				if(resolution != null && resolution.contains("x"))
+				{
+					String dimen[] = resolution.split("x");
+					String height = dimen[0];
+					String width = dimen[1];
+
+					String dimenHeight = "";
+					if(height != null)
+					{
+						height = height.trim();
+						for(int i=height.length()-1; i>=0; i--)
+						{
+							String ch = Character.toString(height.charAt(i));
+							if(!ch.matches("[0-9]"))
+							{
+								break;
+							}
+							dimenHeight = ch + dimenHeight;
+						}
+					}
+
+					String dimenWidth = "";
+					if(width != null)
+					{
+						width = width.trim();
+						for(int i=0; i<width.length(); i++)
+						{
+							String ch = Character.toString(width.charAt(i));
+							if(!ch.matches("[0-9]"))
+							{
+								break;
+							}
+							dimenWidth = dimenWidth + ch;
+
+						}
+					}
+
+					try
+					{
+						mMedia.height = Integer.parseInt(dimenHeight);
+					}
+					catch(NumberFormatException ex)
+					{
+						ex.printStackTrace();
+					}
+
+					try
+					{
+						mMedia.width = Integer.parseInt(dimenWidth);
+					}
+					catch(NumberFormatException ex)
+					{
+						ex.printStackTrace();
+					}
+				}
 			}
 			
 			//Stream #0:1(eng): Audio: aac (mp4a / 0x6134706D), 48000 Hz, stereo, s16, 121 kb/s
