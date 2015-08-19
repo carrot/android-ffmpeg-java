@@ -662,8 +662,6 @@ out.avi – create this output file. Change it as you like, for example using an
 						@Override
 						public void processComplete(int exitValue)
 						{
-							Log.d(TAG, "callbk:complete::" + command.toString());
-							Log.d(TAG, "callbl:tempFile=" + tempFile.getAbsolutePath());
 							sc.processComplete(exitValue);
 							if(tempFile.exists())
 							{
