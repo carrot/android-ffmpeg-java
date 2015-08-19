@@ -591,6 +591,7 @@ out.avi – create this output file. Change it as you like, for example using an
 
 	private void squareCropVideo(File inputFile, final File outputFile, int squareSize, final ShellCallback sc, final int audioBitRate, final int rotate) throws IOException, InterruptedException
 	{
+		Log.d(TAG, "squareCropVideo:");
 		ArrayList<String> c = new ArrayList<String>();
 
 		c.add(mFfmpegBin);
@@ -611,13 +612,14 @@ out.avi – create this output file. Change it as you like, for example using an
 		c.add("-c:a");
 		c.add("aac");
 
-		if(audioBitRate != -1)
+		if(audioBitRate >= 0)
 		{
 			c.add("-strict");
 			c.add("experimental");
 
 			c.add("-b:a");
 			c.add(String.valueOf(audioBitRate));
+			Log.d(TAG, "audioBitrate=" + audioBitRate);
 		}
 
 		c.add("-preset");
@@ -627,14 +629,14 @@ out.avi – create this output file. Change it as you like, for example using an
 		final File tempFile = new File(absPath.substring(0, absPath.lastIndexOf(".")) + "_sqr.mp4");
 		c.add(tempFile.getAbsolutePath());
 
-		StringBuilder command = new StringBuilder();
+		final StringBuilder command = new StringBuilder();
 		for(String s : c)
 		{
 			command.append(s);
 			command.append(" ");
 		}
 
-		Log.d(TAG, "Command:" + command.toString());
+		Log.d(TAG, "squareCrop:Command:" + command.toString());
 
 		execFFMPEG(c, new ShellCallback()
 		{
@@ -660,6 +662,8 @@ out.avi – create this output file. Change it as you like, for example using an
 						@Override
 						public void processComplete(int exitValue)
 						{
+							Log.d(TAG, "callbk:complete::" + command.toString());
+							Log.d(TAG, "callbl:tempFile=" + tempFile.getAbsolutePath());
 							sc.processComplete(exitValue);
 							if(tempFile.exists())
 							{
@@ -684,6 +688,7 @@ out.avi – create this output file. Change it as you like, for example using an
 
 	private void rotateVideo(File inputFile, File outputFile, ShellCallback sc, int audioBitRate, int rotate) throws IOException, InterruptedException
 	{
+		Log.d(TAG, "rotateVideo");
 		ArrayList<String> c = new ArrayList<String>();
 
 		c.add(mFfmpegBin);
@@ -725,6 +730,14 @@ out.avi – create this output file. Change it as you like, for example using an
 			}
 		}
 
+		final StringBuilder command = new StringBuilder();
+		for(String s : c)
+		{
+			command.append(s);
+			command.append(" ");
+		}
+
+		Log.d(TAG, "rotateVideo:Command:" + command.toString());
 		c.add(outputFile.getAbsolutePath());
 		execFFMPEG(c, sc);
 	}
@@ -1691,7 +1704,10 @@ out.avi – create this output file. Change it as you like, for example using an
 				String bitRate = audioInfo[4].replaceAll("[^0-9]", "").trim();
 				try
 				{
-					mMedia.audioBitrate = Integer.parseInt(bitRate) ;
+					/**
+					 * bit rate is kb/s convert it to b/s by multliplying it with 1000
+					 */
+					mMedia.audioBitrate = Integer.parseInt(bitRate) * 1000 ;
 				}
 				catch (NumberFormatException e)
 				{
