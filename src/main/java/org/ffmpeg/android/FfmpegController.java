@@ -93,8 +93,6 @@ public class FfmpegController {
 		Runtime.getRuntime().exec("chmod "+mode+" "+abspath).waitFor();
 	}
 
-	
-	
 	private void execFFMPEG (List<String> cmd, ShellCallback sc, File fileExec) throws IOException, InterruptedException {
 	
 		enablePermissions();
@@ -220,7 +218,7 @@ public class FfmpegController {
 		
 		
 	}
-	
+
 	public void processVideo(Clip in, Clip out, boolean enableExperimental, ShellCallback sc) throws Exception {
 		
     	ArrayList<String> cmd = new ArrayList<String>();
@@ -563,6 +561,33 @@ out.avi – create this output file. Change it as you like, for example using an
 
 
 	}
+
+    public interface VideoDurationCallback
+    {
+        void onDurationKnown(double duration);
+        void onDurationUnknown();
+    }
+
+    public void getVideoDurationAsync(final VideoDurationCallback cb)
+    {
+        try
+        {
+            getMediaInfo(
+                    new Clip(mFileTemp.getAbsolutePath()), new InfoParserListener()
+                    {
+                        @Override
+                        public void onDone(Clip clip)
+                        {
+                            cb.onDurationKnown(clip.duration);
+                        }
+                    }
+            );
+        }
+        catch(Exception e)
+        {
+            cb.onDurationUnknown();
+        }
+    }
 
     public void squareCrop(final File inputFile, final File outputFile, final ShellCallback sc) throws IOException, InterruptedException
     {
