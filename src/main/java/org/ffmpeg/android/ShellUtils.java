@@ -268,6 +268,11 @@ public class ShellUtils
             proc.waitFor();
 
         }
+
+        /**
+         * Sometimes there is a race condition, so wait for a few a few milliseconds before
+         * calling process complete
+         */
         new Handler().postDelayed(new Runnable()
         {
             @Override
