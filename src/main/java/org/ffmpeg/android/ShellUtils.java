@@ -1,4 +1,5 @@
-/* Copyright (c) 2009, Nathan Freitas, Orbot / The Guardian Project - http://openideals.com/guardian */
+/* Copyright (c) 2009, Nathan Freitas, Orbot / The Guardian Project - http://openideals
+.com/guardian */
 /* See LICENSE for licensing information */
 package org.ffmpeg.android;
 
@@ -13,7 +14,8 @@ import java.util.StringTokenizer;
 import android.os.Handler;
 import android.util.Log;
 
-public class ShellUtils {
+public class ShellUtils
+{
 
     //various console cmds
     public final static String SHELL_CMD_CHMOD = "chmod";
@@ -29,50 +31,61 @@ public class ShellUtils {
 
         StringBuilder log = new StringBuilder();
 
-        try {
+        try
+        {
 
             // Check if Superuser.apk exists
             File fileSU = new File("/system/app/Superuser.apk");
-            if (fileSU.exists())
+            if(fileSU.exists())
+            {
                 return true;
+            }
 
             fileSU = new File("/system/bin/su");
-            if (fileSU.exists())
+            if(fileSU.exists())
+            {
                 return true;
+            }
 
             //Check for 'su' binary
             String[] cmd = {"which su"};
-            int exitCode = ShellUtils.doShellCommand(null,cmd, new ShellCallback ()
+            int exitCode = ShellUtils.doShellCommand(null, cmd, new ShellCallback()
             {
 
                 @Override
-                public void shellOut(String msg) {
+                public void shellOut(String msg)
+                {
 
                     //System.out.print(msg);
 
                 }
 
                 @Override
-                public void processComplete(int exitValue) {
+                public void processComplete(int exitValue)
+                {
                     // TODO Auto-generated method stub
 
                 }
 
             }, false, true).exitValue();
 
-            if (exitCode == 0) {
+            if(exitCode == 0)
+            {
                 logMessage("Can acquire root permissions");
                 return true;
 
             }
 
-        } catch (IOException e) {
+        }
+        catch(IOException e)
+        {
             //this means that there is no root to be had (normally) so we won't log anything
-            logException("Error checking for root access",e);
+            logException("Error checking for root access", e);
 
         }
-        catch (Exception e) {
-            logException("Error checking for root access",e);
+        catch(Exception e)
+        {
+            logException("Error checking for root access", e);
             //this means that there is no root to be had (normally)
         }
 
@@ -85,24 +98,26 @@ public class ShellUtils {
 
     public static int findProcessId(String command)
     {
-        int procId = -1;
+        int procId = - 1;
 
         try
         {
             procId = findProcessIdWithPidOf(command);
 
-            if (procId == -1)
+            if(procId == - 1)
+            {
                 procId = findProcessIdWithPS(command);
+            }
         }
-        catch (Exception e)
+        catch(Exception e)
         {
             try
             {
                 procId = findProcessIdWithPS(command);
             }
-            catch (Exception e2)
+            catch(Exception e2)
             {
-                logException("Unable to get proc id for: " + command,e2);
+                logException("Unable to get proc id for: " + command, e2);
             }
         }
 
@@ -113,7 +128,7 @@ public class ShellUtils {
     public static int findProcessIdWithPidOf(String command) throws Exception
     {
 
-        int procId = -1;
+        int procId = - 1;
 
         Runtime r = Runtime.getRuntime();
 
@@ -121,13 +136,13 @@ public class ShellUtils {
 
         String baseName = new File(command).getName();
         //fix contributed my mikos on 2010.12.10
-        procPs = r.exec(new String[] {SHELL_CMD_PIDOF, baseName});
+        procPs = r.exec(new String[]{SHELL_CMD_PIDOF, baseName});
         //procPs = r.exec(SHELL_CMD_PIDOF);
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(procPs.getInputStream()));
         String line = null;
 
-        while ((line = reader.readLine())!=null)
+        while((line = reader.readLine()) != null)
         {
 
             try
@@ -136,9 +151,9 @@ public class ShellUtils {
                 procId = Integer.parseInt(line.trim());
                 break;
             }
-            catch (NumberFormatException e)
+            catch(NumberFormatException e)
             {
-                logException("unable to parse process pid: " + line,e);
+                logException("unable to parse process pid: " + line, e);
             }
         }
 
@@ -151,7 +166,7 @@ public class ShellUtils {
     public static int findProcessIdWithPS(String command) throws Exception
     {
 
-        int procId = -1;
+        int procId = - 1;
 
         Runtime r = Runtime.getRuntime();
 
@@ -162,12 +177,12 @@ public class ShellUtils {
         BufferedReader reader = new BufferedReader(new InputStreamReader(procPs.getInputStream()));
         String line = null;
 
-        while ((line = reader.readLine())!=null)
+        while((line = reader.readLine()) != null)
         {
-            if (line.indexOf(' ' + command)!=-1)
+            if(line.indexOf(' ' + command) != - 1)
             {
 
-                StringTokenizer st = new StringTokenizer(line," ");
+                StringTokenizer st = new StringTokenizer(line, " ");
                 st.nextToken(); //proc owner
 
                 procId = Integer.parseInt(st.nextToken().trim());
@@ -177,35 +192,43 @@ public class ShellUtils {
         }
 
 
-
         return procId;
 
     }
 
-    public static int doShellCommand(String[] cmds, ShellCallback sc, boolean runAsRoot, boolean waitFor) throws Exception
+    public static int doShellCommand(String[] cmds, ShellCallback sc, boolean runAsRoot, boolean
+            waitFor) throws
+            Exception
     {
-        return doShellCommand (null, cmds, sc, runAsRoot, waitFor).exitValue();
+        return doShellCommand(null, cmds, sc, runAsRoot, waitFor).exitValue();
 
     }
 
-    public static Process doShellCommand(Process process, String[] cmds, final ShellCallback sc, boolean runAsRoot, boolean waitFor) throws Exception
+    public static Process doShellCommand(Process process, String[] cmds, final ShellCallback sc,
+                                         boolean runAsRoot, boolean waitFor) throws
+            Exception
     {
 
-        if (process == null)
+        if(process == null)
         {
-            if (runAsRoot)
+            if(runAsRoot)
+            {
                 process = Runtime.getRuntime().exec("su");
+            }
             else
+            {
                 process = Runtime.getRuntime().exec("sh");
+            }
         }
 
         final Process proc = process;
 
         OutputStreamWriter out = new OutputStreamWriter(proc.getOutputStream());
 
-        for (int i = 0; i < cmds.length; i++)
+        for(int i = 0; i < cmds.length; i++)
         {
-            logMessage("executing shell cmd: " + cmds[i] + "; runAsRoot=" + runAsRoot + ";waitFor=" + waitFor);
+            logMessage("executing shell cmd: " + cmds[i] + "; runAsRoot=" + runAsRoot + ";" +
+                    "waitFor=" + waitFor);
 
             out.write(cmds[i]);
             out.write("\n");
@@ -215,23 +238,31 @@ public class ShellUtils {
         out.write("exit\n");
         out.flush();
 
-        if (waitFor)
+        if(waitFor)
         {
 
             final char buf[] = new char[20];
 
             // Consume the "stdout"
             InputStreamReader reader = new InputStreamReader(proc.getInputStream());
-            int read=0;
-            while ((read=reader.read(buf)) != -1) {
-                if (sc != null) sc.shellOut(new String(buf));
+            int read = 0;
+            while((read = reader.read(buf)) != - 1)
+            {
+                if(sc != null)
+                {
+                    sc.shellOut(new String(buf));
+                }
             }
 
             // Consume the "stderr"
             reader = new InputStreamReader(proc.getErrorStream());
-            read=0;
-            while ((read=reader.read(buf)) != -1) {
-                if (sc != null) sc.shellOut(new String(buf));
+            read = 0;
+            while((read = reader.read(buf)) != - 1)
+            {
+                if(sc != null)
+                {
+                    sc.shellOut(new String(buf));
+                }
             }
 
             proc.waitFor();
@@ -250,20 +281,20 @@ public class ShellUtils {
 
     }
 
-    public static void logMessage (String msg)
+    public static void logMessage(String msg)
     {
 
     }
 
-    public static void logException (String msg, Exception e)
+    public static void logException(String msg, Exception e)
     {
 
     }
 
     public interface ShellCallback
     {
-        public void shellOut (String shellLine);
+        public void shellOut(String shellLine);
 
-        public void processComplete (int exitValue);
+        public void processComplete(int exitValue);
     }
 }
