@@ -10,6 +10,7 @@ import java.io.OutputStreamWriter;
 import java.util.StringTokenizer;
 
 
+import android.os.Handler;
 import android.util.Log;
 
 public class ShellUtils {
@@ -187,17 +188,18 @@ public class ShellUtils {
 		
 	}
 	
-	public static Process doShellCommand(Process proc, String[] cmds, ShellCallback sc, boolean runAsRoot, boolean waitFor) throws Exception
+	public static Process doShellCommand(Process process, String[] cmds, final ShellCallback sc, boolean runAsRoot, boolean waitFor) throws Exception
 	{
-		
-		
-		if (proc == null)
+
+		if (process == null)
 		{
 	    	if (runAsRoot)
-	    		proc = Runtime.getRuntime().exec("su");
+	    		process = Runtime.getRuntime().exec("su");
 	    	else
-	    		proc = Runtime.getRuntime().exec("sh");
-		}	
+	    		process = Runtime.getRuntime().exec("sh");
+		}
+
+		final Process proc = process;
     	
     	OutputStreamWriter out = new OutputStreamWriter(proc.getOutputStream());
         
@@ -235,9 +237,15 @@ public class ShellUtils {
 			proc.waitFor();
 			
 		}
-        
-		sc.processComplete(proc.exitValue());
-        
+		new Handler().postDelayed(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				sc.processComplete(proc.exitValue());
+			}
+		}, 150);
+
         return proc;
 
 	}

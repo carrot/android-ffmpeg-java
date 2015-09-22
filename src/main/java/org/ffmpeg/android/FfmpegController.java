@@ -30,6 +30,7 @@ public class FfmpegController {
 
 	
 	private String mFfmpegBin;
+	private String mQtFastStartBin;
 	
 	private final static String TAG = "FFMPEG";
 	
@@ -46,6 +47,7 @@ public class FfmpegController {
 	public void installBinaries(Context context, boolean overwrite)
 	{
 		mFfmpegBin = installBinary(context, R.raw.ffmpeg, "ffmpeg", overwrite);
+		mQtFastStartBin = installBinary(context, R.raw.qt_faststart, "qt-faststart", overwrite);
 	}
 	
 	public String getBinaryPath ()
@@ -709,7 +711,7 @@ out.avi – create this output file. Change it as you like, for example using an
 		});
 	}
 
-	private void rotateVideo(File inputFile, File outputFile, ShellCallback sc, int audioBitRate, int rotate) throws IOException, InterruptedException
+	private void rotateVideo(File inputFile, final File outputFile, final ShellCallback sc, int audioBitRate, int rotate) throws IOException, InterruptedException
 	{
 		Log.d(TAG, "rotateVideo");
 		ArrayList<String> c = new ArrayList<String>();
@@ -761,8 +763,65 @@ out.avi – create this output file. Change it as you like, for example using an
 		}
 
 		Log.d(TAG, "rotateVideo:Command:" + command.toString());
-		c.add(outputFile.getAbsolutePath());
-		execFFMPEG(c, sc);
+
+		String absPath = outputFile.getAbsolutePath();
+		final File tempFile = new File(absPath.substring(0, absPath.lastIndexOf(".")) + "_atom.mp4");
+		c.add(tempFile.getAbsolutePath());
+		execFFMPEG(c, new ShellCallback()
+		{
+			@Override
+			public void shellOut(String shellLine)
+			{
+				Log.d(TAG, "rotate::shellOut::" + shellLine);
+			}
+
+			@Override
+			public void processComplete(int exitValue)
+			{
+				Log.d(TAG, "rotate::processComplete::" + exitValue);
+				try
+				{
+					addMoovAtomFlag(tempFile, outputFile, new ShellCallback()
+                    {
+                        @Override
+                        public void shellOut(String shellLine)
+                        {
+							Log.d(TAG, "addMoovFlag::shellLine::" + shellLine);
+                        }
+
+                        @Override
+                        public void processComplete(int exitValue)
+                        {
+							Log.d(TAG, "addMoovFlag::exitValue::" + exitValue);
+							sc.processComplete(exitValue);
+							if(tempFile.exists())
+							{
+								tempFile.delete();
+							}
+                        }
+                    });
+				}
+				catch(IOException e)
+				{
+					e.printStackTrace();
+				}
+				catch(InterruptedException e)
+				{
+					e.printStackTrace();
+				}
+			}
+		});
+	}
+
+	private void addMoovAtomFlag(final File inputFile, final File outputFile, final ShellCallback sc) throws
+			IOException, InterruptedException
+	{
+		ArrayList<String> commands = new ArrayList<>();
+		commands.add(mQtFastStartBin);
+		commands.add(inputFile.getAbsolutePath());
+		commands.add(outputFile.getAbsolutePath());
+
+		execFFMPEG(commands, sc, new File(mQtFastStartBin).getParentFile());
 	}
 
 	public void trim(final File inputFile, final File outputFile, final ShellCallback sc) throws IOException, InterruptedException
